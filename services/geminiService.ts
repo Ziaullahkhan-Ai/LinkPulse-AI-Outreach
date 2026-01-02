@@ -4,21 +4,13 @@ import { Lead } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
 
-/**
- * REMARKABLE PROMPT STRUCTURE:
- * 1. Role: Senior Sales Intelligence Architect
- * 2. Objective: Analyze lead data to determine intent and score potential ROI.
- * 3. Context: We want high-intent B2B leads, not spray-and-pray.
- * 4. Data: Lead profile snippet and recent activity.
- */
-
 export const scoreLead = async (lead: Partial<Lead>): Promise<{ score: number; reasoning: string; intent: string }> => {
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: `
-      ROLE: Senior Sales Intelligence Architect & Lead Analyst.
-      OBJECTIVE: Qualify this LinkedIn lead based on their profile and activity.
-      CONTEXT: We are a high-end B2B SaaS company. We only want to reach out to people who show "High Intent" (recent hiring, relevant posts, specific pain points mentioned, or authority roles).
+      ROLE: Senior Sales Intelligence Architect.
+      OBJECTIVE: Qualify this LinkedIn lead.
+      CONTEXT: High-end B2B SaaS target. Look for "High Intent" (authority roles, scaling indicators, relevant industry).
       DATA: 
       Name: ${lead.name}
       Headline: ${lead.headline}
@@ -27,7 +19,7 @@ export const scoreLead = async (lead: Partial<Lead>): Promise<{ score: number; r
 
       TASK: Provide a JSON response with:
       - score (0-100)
-      - reasoning (1-2 sentences)
+      - reasoning (1-2 sentences why this score)
       - intent (Low, Medium, High)
     `,
     config: {
@@ -44,25 +36,37 @@ export const scoreLead = async (lead: Partial<Lead>): Promise<{ score: number; r
     }
   });
 
-  const result = JSON.parse(response.text);
-  return result;
+  return JSON.parse(response.text);
 };
 
 export const generateOutreach = async (lead: Lead): Promise<string> => {
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: `
-      ROLE: Human-Centric Relationship Builder (Anti-Spam specialist).
-      OBJECTIVE: Write a personalized, non-salesy LinkedIn outreach message.
-      CONTEXT: The goal is to start a conversation, NOT to sell. Use the context of their recent post or profile headline.
-      RULES: No "I hope this finds you well", no "I saw your profile and was impressed", no pitch in the first message. Be brief, specific, and genuinely curious.
-      DATA: 
-      Lead: ${lead.name}
-      Company: ${lead.company}
-      Bio: ${lead.headline}
-      Context/Post: ${lead.recentPost || 'Profile headline'}
+      ROLE: Relationship Builder (Anti-Spam expert).
+      OBJECTIVE: Write a non-salesy, personalized LinkedIn message.
+      RULES: Max 3 sentences. No fluff. No "I hope you are well". Focus on a specific observation from their headline or post.
+      DATA: ${lead.name} at ${lead.company}. Bio: ${lead.headline}. Recent Activity: ${lead.recentPost}
+    `,
+  });
 
-      TASK: Write a 2-3 sentence LinkedIn connection note or message.
+  return response.text.trim();
+};
+
+export const chatWithAssistant = async (message: string, leadsContext: Lead[]): Promise<string> => {
+  const leadSummary = leadsContext.map(l => `${l.name} (${l.company}) - Score: ${l.score || 'N/A'}, Status: ${l.status}`).join('\n');
+  
+  const response = await ai.models.generateContent({
+    model: 'gemini-3-flash-preview',
+    contents: `
+      ROLE: LinkPulse Sales Strategist.
+      CONTEXT: You are assisting a user managing their LinkedIn leads. 
+      CURRENT LEADS IN SYSTEM:
+      ${leadSummary}
+
+      USER MESSAGE: ${message}
+
+      TASK: Answer the user's question. If they ask about specific leads, refer to the data provided. Be professional, concise, and helpful.
     `,
   });
 
