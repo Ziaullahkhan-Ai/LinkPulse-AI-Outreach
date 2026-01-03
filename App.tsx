@@ -21,8 +21,8 @@ import {
   ArrowRight,
   Target
 } from 'lucide-react';
-import { Lead, LeadStatus, OutreachStats } from './types.ts';
-import { scoreLead, generateOutreach, chatWithAssistant } from './services/geminiService.ts';
+import { Lead, LeadStatus, OutreachStats } from './types';
+import { scoreLead, generateOutreach, chatWithAssistant } from './services/geminiService';
 import { 
   BarChart,
   Bar,

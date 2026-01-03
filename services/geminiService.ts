@@ -1,5 +1,6 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
-import { Lead } from "../types.ts";
+import { Lead } from "../types";
 
 /**
  * Standard factory for obtaining a Gemini API instance.
