@@ -30,7 +30,56 @@ import {
   ResponsiveContainer
 } from 'recharts';
 
-// --- Sub-components (Defined first to avoid temporal dead zone) ---
+// --- Error Boundary ---
+
+interface ErrorBoundaryProps { 
+  children?: ReactNode; 
+}
+interface ErrorBoundaryState { 
+  hasError: boolean; 
+  error: Error | null; 
+}
+
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("LinkPulse critical error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex items-center justify-center min-h-screen bg-slate-50 p-6 text-center">
+          <div className="bg-white p-8 rounded-3xl shadow-2xl max-w-sm border border-red-100">
+            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h1 className="text-xl font-bold text-slate-900 mb-2">Interface Error</h1>
+            <p className="text-slate-500 mb-6 text-sm">{this.state.error?.message || 'A rendering error occurred.'}</p>
+            <button 
+              onClick={() => {
+                localStorage.clear();
+                window.location.reload();
+              }} 
+              className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700 transition-all"
+            >
+              Reset Cache & Reload
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// --- UI Components ---
 
 const StatBox = ({ label, val, color }: { label: string, val: number, color: string }) => (
   <div className="bg-white p-5 rounded-2xl border border-slate-200">
@@ -50,11 +99,13 @@ const SidebarLink = ({ icon, label, active, onClick, count }: { icon: ReactNode,
     </div>
     {typeof count === 'number' && count > 0 && (
       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${active ? 'bg-indigo-400 text-white' : 'bg-indigo-600 text-white'}`}>
-        {count}
+        {String(count)}
       </span>
     )}
   </button>
 );
+
+// --- Subviews ---
 
 const DashboardView = ({ stats }: { stats: OutreachStats }) => (
   <div className="space-y-8 animate-fade-in">
@@ -96,7 +147,7 @@ const LeadsView = ({ leads, qualify, remove }: { leads: Lead[], qualify: (id: st
       <tbody className="divide-y divide-slate-100">
         {leads.length === 0 ? (
           <tr>
-            <td colSpan={4} className="px-6 py-10 text-center text-slate-400 italic">No leads found matching your criteria.</td>
+            <td colSpan={4} className="px-6 py-10 text-center text-slate-400 italic">No leads in the explorer.</td>
           </tr>
         ) : (
           leads.map((l: Lead) => (
@@ -117,7 +168,7 @@ const LeadsView = ({ leads, qualify, remove }: { leads: Lead[], qualify: (id: st
               </td>
               <td className="px-6 py-4">
                 <span className={`px-2 py-1 rounded-md text-[9px] font-bold uppercase tracking-tight ${l.status === LeadStatus.NEW ? 'bg-slate-100' : 'bg-indigo-50 text-indigo-700'}`}>
-                  {l.status}
+                  {String(l.status)}
                 </span>
               </td>
               <td className="px-6 py-4 text-right space-x-2">
@@ -149,8 +200,8 @@ const ImportView = ({ onImport }: { onImport: (data: any[]) => void }) => {
   };
   return (
     <div className="max-w-2xl mx-auto bg-white p-8 rounded-3xl border border-slate-200 shadow-sm animate-fade-in">
-      <h2 className="text-xl font-bold mb-2 text-slate-900">Import Prospects</h2>
-      <p className="text-slate-400 text-sm mb-6">Format: Name, Company, Headline (One per line)</p>
+      <h2 className="text-xl font-bold mb-2 text-slate-900">Import Leads</h2>
+      <p className="text-slate-400 text-sm mb-6">Format: Name, Company, Headline (CSV)</p>
       <textarea 
         value={val} 
         onChange={e => setVal(e.target.value)} 
@@ -160,9 +211,9 @@ const ImportView = ({ onImport }: { onImport: (data: any[]) => void }) => {
       <button 
         onClick={process} 
         disabled={!val.trim()} 
-        className="w-full bg-indigo-600 text-white font-bold py-4 rounded-2xl hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-lg shadow-indigo-100"
+        className="w-full bg-indigo-600 text-white font-bold py-4 rounded-2xl hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-lg"
       >
-        Process List
+        Import Data
       </button>
     </div>
   );
@@ -171,73 +222,29 @@ const ImportView = ({ onImport }: { onImport: (data: any[]) => void }) => {
 const ApprovalView = ({ leads, approve }: { leads: Lead[], approve: (id: string) => void }) => (
   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in">
     {leads.length === 0 ? (
-      <div className="col-span-2 py-20 text-center text-slate-400 bg-white rounded-3xl border border-dashed">No leads waiting for approval.</div>
+      <div className="col-span-2 py-20 text-center text-slate-400 bg-white rounded-3xl border border-dashed">No leads waiting for outreach.</div>
     ) : (
       leads.map((l: Lead) => (
-        <div key={l.id} className="bg-white p-6 rounded-3xl border border-slate-200 flex flex-col shadow-sm hover:shadow-md transition-shadow">
+        <div key={l.id} className="bg-white p-6 rounded-3xl border border-slate-200 flex flex-col shadow-sm">
           <div className="flex justify-between mb-4">
             <div>
               <h4 className="font-bold text-slate-900">{l.name}</h4>
               <p className="text-[10px] text-indigo-600 font-bold uppercase">{l.company}</p>
             </div>
-            <div className="bg-indigo-50 text-indigo-700 font-black text-xs px-2 py-1 rounded-lg h-fit">{l.score}%</div>
+            <div className="bg-indigo-50 text-indigo-700 font-black text-xs px-2 py-1 rounded-lg h-fit">{String(l.score)}%</div>
           </div>
           <div className="bg-slate-50 p-4 rounded-xl text-xs text-slate-600 mb-4 flex-1 border border-slate-100">
             <div className="font-bold text-[9px] text-slate-400 uppercase mb-2 tracking-wider">AI Generated Message</div>
-            <p className="italic leading-relaxed">"{l.generatedMessage}"</p>
+            <p className="italic leading-relaxed">"{l.generatedMessage || 'Drafting...'}"</p>
           </div>
           <button onClick={() => approve(l.id)} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700 flex items-center justify-center gap-2 transition-all">
-            <Send size={14} /> Send Now
+            <Send size={14} /> Send Outreach
           </button>
         </div>
       ))
     )}
   </div>
 );
-
-// --- Error Boundary ---
-
-interface ErrorBoundaryProps { 
-  children?: ReactNode; 
-}
-interface ErrorBoundaryState { 
-  hasError: boolean; 
-  error: Error | null; 
-}
-
-// Fix: Use directly imported Component and ensure state/props are correctly recognized by TypeScript.
-class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  constructor(props: ErrorBoundaryProps) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("LinkPulse caught error:", error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="flex items-center justify-center min-h-screen bg-slate-50 p-6 text-center">
-          <div className="bg-white p-8 rounded-3xl shadow-xl max-w-sm border border-red-100">
-            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <h1 className="text-xl font-bold text-slate-900 mb-2">Something went wrong</h1>
-            <p className="text-slate-500 mb-6 text-sm">{this.state.error?.message || 'Application Crash'}</p>
-            <button onClick={() => window.location.reload()} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700 transition-all">
-              Reload App
-            </button>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
 
 // --- Main Application Components ---
 
@@ -254,7 +261,7 @@ const AppContent: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<{role: 'user' | 'assistant', text: string}[]>([
-    { role: 'assistant', text: "Welcome! I'm your LinkPulse strategist. How can I help you optimize your LinkedIn outreach today?" }
+    { role: 'assistant', text: "Hello! I'm your LinkPulse strategist. How can I help you today?" }
   ]);
   const [chatInput, setChatInput] = useState('');
   const [isChatTyping, setIsChatTyping] = useState(false);
@@ -265,8 +272,10 @@ const AppContent: React.FC = () => {
   }, [leads]);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatMessages]);
+    if (isChatOpen) {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages, isChatOpen]);
 
   const stats = useMemo(() => ({
     totalLeads: leads.length,
@@ -319,7 +328,7 @@ const AppContent: React.FC = () => {
       } : l));
     } catch (error) {
       setLeads(prev => prev.map(l => l.id === id ? { ...l, status: LeadStatus.NEW } : l));
-      alert("AI analysis failed. Please check your API key.");
+      alert("AI analysis failed. Check console for details.");
     }
   };
 
@@ -341,34 +350,34 @@ const AppContent: React.FC = () => {
       const response = await chatWithAssistant(userMsg, leads);
       setChatMessages(prev => [...prev, { role: 'assistant', text: response }]);
     } catch (e) {
-      setChatMessages(prev => [...prev, { role: 'assistant', text: "Error connecting to AI. Check your connection." }]);
+      setChatMessages(prev => [...prev, { role: 'assistant', text: "Strategy engine is offline." }]);
     } finally {
       setIsChatTyping(false);
     }
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden text-slate-900 font-inter">
+    <div className="flex h-screen bg-slate-50 overflow-hidden text-slate-900">
       {/* Sidebar */}
       <aside className="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col shrink-0">
         <div className="p-6">
           <div className="flex items-center gap-2 mb-10">
-            <div className="bg-indigo-600 p-2 rounded-xl text-white shadow-lg shadow-indigo-100">
+            <div className="bg-indigo-600 p-2 rounded-xl text-white shadow-lg">
               <Sparkles size={20} />
             </div>
             <h1 className="text-lg font-black tracking-tight text-slate-900">LinkPulse AI</h1>
           </div>
           <nav className="space-y-1">
-            <SidebarLink icon={<LayoutDashboard size={18} />} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
+            <SidebarLink icon={<LayoutDashboard size={18} />} label="Overview" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
             <SidebarLink icon={<Users size={18} />} label="Leads Explorer" active={activeTab === 'leads'} onClick={() => setActiveTab('leads')} />
-            <SidebarLink icon={<FileUp size={18} />} label="Bulk Import" active={activeTab === 'import'} onClick={() => setActiveTab('import')} />
+            <SidebarLink icon={<FileUp size={18} />} label="Import" active={activeTab === 'import'} onClick={() => setActiveTab('import')} />
             <SidebarLink icon={<CheckSquare size={18} />} label="Approvals" active={activeTab === 'approval'} onClick={() => setActiveTab('approval')} count={stats.pendingApproval} />
           </nav>
         </div>
         <div className="mt-auto p-6 border-t border-slate-100">
           <button 
-            onClick={() => {if(confirm("Wipe all local data?")) setLeads([])}} 
-            className="text-xs font-bold text-slate-400 hover:text-red-500 flex items-center gap-2 transition-colors w-full px-3 py-2 rounded-lg hover:bg-red-50"
+            onClick={() => {if(confirm("Wipe all leads?")) setLeads([])}} 
+            className="text-xs font-bold text-slate-400 hover:text-red-500 flex items-center gap-2 transition-colors w-full px-3 py-2"
           >
             <Trash2 size={14} /> Clear All Data
           </button>
@@ -385,14 +394,10 @@ const AppContent: React.FC = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Filter leads..." 
-              className="w-full bg-slate-50 border-none rounded-xl py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+              className="w-full bg-slate-50 border-none rounded-xl py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
             />
           </div>
           <div className="flex items-center gap-4">
-            <button className="p-2 text-slate-400 hover:text-indigo-600 transition-colors relative">
-              <Bell size={20} />
-              {stats.pendingApproval > 0 && <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>}
-            </button>
             <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-xs shadow-md">A</div>
           </div>
         </header>
@@ -411,27 +416,24 @@ const AppContent: React.FC = () => {
       <div className={`fixed bottom-6 right-6 transition-all duration-300 z-50 ${isChatOpen ? 'w-80 h-[500px]' : 'w-14 h-14'}`}>
         {isChatOpen ? (
           <div className="w-full h-full bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
-            <div className="p-4 bg-indigo-600 text-white flex items-center justify-between shadow-md">
-              <div className="flex items-center gap-2">
-                <MessageCircle size={18} />
-                <span className="font-bold text-sm">AI Strategist</span>
-              </div>
-              <button onClick={() => setIsChatOpen(false)} className="hover:rotate-90 transition-transform"><X size={18} /></button>
+            <div className="p-4 bg-indigo-600 text-white flex items-center justify-between">
+              <span className="font-bold text-sm">Strategist</span>
+              <button onClick={() => setIsChatOpen(false)}><X size={18} /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50">
               {chatMessages.map((m, i) => (
                 <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`p-3 rounded-2xl text-xs max-w-[85%] leading-relaxed shadow-sm ${m.role === 'user' ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white text-slate-700 border border-slate-100 rounded-tl-none'}`}>
+                  <div className={`p-3 rounded-2xl text-xs max-w-[85%] ${m.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-700 border border-slate-100'}`}>
                     {m.text}
                   </div>
                 </div>
               ))}
               {isChatTyping && (
                 <div className="flex justify-start">
-                  <div className="p-3 bg-white border border-slate-100 rounded-2xl rounded-tl-none flex gap-1">
-                    <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce"></div>
-                    <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                    <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                  <div className="p-3 bg-white border border-slate-100 rounded-2xl flex gap-1">
+                    <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce"></div>
+                    <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                    <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
                   </div>
                 </div>
               )}
@@ -442,10 +444,10 @@ const AppContent: React.FC = () => {
                 value={chatInput} 
                 onChange={e => setChatInput(e.target.value)} 
                 onKeyDown={e => e.key === 'Enter' && handleChatSend()}
-                placeholder="Ask your strategist..." 
-                className="flex-1 text-xs p-2 bg-slate-50 rounded-lg outline-none focus:ring-1 focus:ring-indigo-500" 
+                placeholder="Ask me..." 
+                className="flex-1 text-xs p-2 bg-slate-50 rounded-lg outline-none" 
               />
-              <button onClick={handleChatSend} className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-md">
+              <button onClick={handleChatSend} className="p-2 bg-indigo-600 text-white rounded-lg">
                 <Send size={14} />
               </button>
             </div>
@@ -453,7 +455,7 @@ const AppContent: React.FC = () => {
         ) : (
           <button 
             onClick={() => setIsChatOpen(true)} 
-            className="w-14 h-14 bg-indigo-600 text-white rounded-full flex items-center justify-center shadow-2xl hover:scale-110 transition-transform active:scale-95 shadow-indigo-200"
+            className="w-14 h-14 bg-indigo-600 text-white rounded-full flex items-center justify-center shadow-2xl hover:scale-110 transition-transform"
           >
             <MessageCircle size={24} />
           </button>
