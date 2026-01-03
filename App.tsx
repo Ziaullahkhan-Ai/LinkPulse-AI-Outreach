@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef, Component, ErrorInfo, ReactNode } from 'react';
 import { 
   Users, 
@@ -8,13 +7,11 @@ import {
   Bell,
   Search,
   CheckCircle2,
-  Filter,
   RefreshCw,
   Send,
   MessageCircle,
   X,
   Sparkles,
-  ChevronRight,
   Trash2,
   AlertCircle
 } from 'lucide-react';
@@ -24,11 +21,65 @@ import {
   AreaChart,
   Area,
   XAxis, 
-  YAxis, 
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer
 } from 'recharts';
+
+// --- Error Boundary ---
+
+interface ErrorBoundaryProps { 
+  children?: ReactNode; 
+}
+interface ErrorBoundaryState { 
+  hasError: boolean; 
+  error: Error | null; 
+}
+
+/**
+ * Fix: Inherit from the imported Component class and provide generic types for props and state.
+ * This ensures TypeScript correctly identifies 'this.state' and 'this.props'.
+ */
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("LinkPulse critical error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex items-center justify-center min-h-screen bg-slate-50 p-6 text-center">
+          <div className="bg-white p-10 rounded-[32px] shadow-2xl max-w-sm border border-red-100">
+            <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-6" />
+            <h1 className="text-xl font-black text-slate-900 mb-2 tracking-tight">Interface Conflict</h1>
+            <p className="text-slate-500 mb-8 text-sm leading-relaxed">
+              {this.state.error?.message || 'A rendering error occurred. This is usually caused by browser cache conflicts.'}
+            </p>
+            <button 
+              onClick={() => {
+                localStorage.clear();
+                window.location.reload();
+              }} 
+              className="w-full bg-slate-900 text-white font-bold py-4 rounded-2xl hover:bg-black transition-all"
+            >
+              Reset App Data
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // --- Shared UI Components ---
 
@@ -67,7 +118,7 @@ const DashboardView = ({ stats }: { stats: OutreachStats }) => (
       <StatBox label="Sent" val={stats.sent} color="indigo" />
     </div>
     <div className="bg-white p-6 rounded-3xl border border-slate-200 h-80 shadow-sm relative overflow-hidden">
-      <div className="relative z-10">
+      <div className="relative z-10 p-2">
         <h3 className="font-bold text-sm mb-6 text-slate-900 flex items-center gap-2">
           <RefreshCw size={14} className="text-indigo-500" /> Outreach Growth
         </h3>
@@ -225,55 +276,6 @@ const ApprovalView = ({ leads, approve }: { leads: Lead[], approve: (id: string)
     )}
   </div>
 );
-
-// --- Error Boundary ---
-
-interface ErrorBoundaryProps { 
-  children?: ReactNode; 
-}
-interface ErrorBoundaryState { 
-  hasError: boolean; 
-  error: Error | null; 
-}
-
-// Fix: Explicitly extending React.Component and typing the state property to resolve "Property 'state' does not exist" errors.
-class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  public override state: ErrorBoundaryState = { hasError: false, error: null };
-
-  constructor(props: ErrorBoundaryProps) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return { hasError: true, error };
-  }
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("LinkPulse critical error:", error, errorInfo);
-  }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="flex items-center justify-center min-h-screen bg-slate-50 p-6 text-center">
-          <div className="bg-white p-10 rounded-[32px] shadow-2xl max-w-sm border border-red-100">
-            <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-6" />
-            <h1 className="text-xl font-black text-slate-900 mb-2 tracking-tight">System Crash</h1>
-            <p className="text-slate-500 mb-8 text-sm leading-relaxed">{this.state.error?.message || 'Interface rendering failed.'}</p>
-            <button 
-              onClick={() => {
-                localStorage.clear();
-                window.location.reload();
-              }} 
-              className="w-full bg-slate-900 text-white font-bold py-4 rounded-2xl hover:bg-black transition-all"
-            >
-              Reset App Data
-            </button>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
 
 // --- Main Application ---
 
