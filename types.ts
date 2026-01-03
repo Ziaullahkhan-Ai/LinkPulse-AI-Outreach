@@ -2,10 +2,8 @@
 export enum LeadStatus {
   NEW = 'NEW',
   QUALIFYING = 'QUALIFYING',
-  QUALIFIED = 'QUALIFIED',
-  DISQUALIFIED = 'DISQUALIFIED',
-  READY_FOR_OUTREACH = 'READY_FOR_OUTREACH',
   WAITING_APPROVAL = 'WAITING_APPROVAL',
+  DISQUALIFIED = 'DISQUALIFIED',
   SENT = 'SENT',
   REPLIED = 'REPLIED'
 }
@@ -17,7 +15,6 @@ export interface Lead {
   profileUrl: string;
   company: string;
   location: string;
-  recentPost?: string;
   status: LeadStatus;
   score?: number;
   aiReasoning?: string;
@@ -28,7 +25,7 @@ export interface Lead {
 
 export interface OutreachStats {
   totalLeads: number;
-  qualified: number;
+  qualified: number; // Score > 70
   pendingApproval: number;
   sent: number;
   replied: number;

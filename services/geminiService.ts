@@ -1,17 +1,16 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { Lead } from "../types.ts";
 
 /**
- * Initialize the Gemini API client.
- * Guidelines: Always use process.env.API_KEY directly.
+ * Standard factory for obtaining a Gemini API instance.
+ * Strictly uses process.env.API_KEY.
  */
 const getAI = () => {
   return new GoogleGenAI({ apiKey: process.env.API_KEY as string });
 };
 
 /**
- * Scores a lead using gemini-3-pro-preview for complex reasoning tasks.
+ * Deep analysis of lead potential using Gemini 3 Pro with Thinking Budget.
  */
 export const scoreLead = async (lead: Partial<Lead>): Promise<{ score: number; reasoning: string; intent: string }> => {
   try {
@@ -19,47 +18,61 @@ export const scoreLead = async (lead: Partial<Lead>): Promise<{ score: number; r
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: `
-        Analyze this LinkedIn prospect for B2B relevance:
+        Analyze this LinkedIn prospect for high-ticket B2B networking.
+        
+        PROSPECT:
         Name: ${lead.name}
         Headline: ${lead.headline}
         Company: ${lead.company}
 
-        Return a JSON object: { "score": 0-100, "reasoning": "string", "intent": "Low"|"Medium"|"High" }
+        EVALUATION CRITERIA:
+        1. Authority: Title decision-making power.
+        2. Relevance: Strategic fit for B2B partnerships.
+        3. Reciprocity: Likelihood of responding to high-value networking.
+
+        Respond in JSON format.
       `,
       config: {
+        thinkingConfig: { thinkingBudget: 4000 },
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            score: { type: Type.NUMBER },
-            reasoning: { type: Type.STRING },
-            intent: { type: Type.STRING },
+            score: { 
+              type: Type.NUMBER, 
+              description: "A priority score from 0-100." 
+            },
+            reasoning: { 
+              type: Type.STRING, 
+              description: "Short justification for the score." 
+            },
+            intent: { 
+              type: Type.STRING, 
+              enum: ["Low", "Medium", "High"],
+              description: "Estimated engagement likelihood." 
+            },
           },
           required: ["score", "reasoning", "intent"]
         }
       }
     });
 
-    // Extract text and trim as recommended by Gemini API guidelines.
-    const text = response.text?.trim();
-    if (!text) return { score: 0, reasoning: "No response from AI", intent: "Low" };
+    const jsonStr = response.text?.trim() || '{}';
+    const data = JSON.parse(jsonStr);
     
-    try {
-      // Handle potential markdown formatting in the response.
-      const cleanedText = text.replace(/^```json\n?/, '').replace(/\n?```$/, '');
-      return JSON.parse(cleanedText);
-    } catch (parseError) {
-      console.error("JSON Parsing Error:", parseError, text);
-      return { score: 0, reasoning: "Failed to parse AI scoring data", intent: "Low" };
-    }
+    return {
+      score: data.score ?? 0,
+      reasoning: data.reasoning ?? "Analysis complete.",
+      intent: data.intent ?? "Low"
+    };
   } catch (error) {
-    console.error("Score Error:", error);
-    return { score: 0, reasoning: "Error analyzing lead", intent: "Low" };
+    console.error("Scoring error:", error);
+    return { score: 0, reasoning: "AI analysis interrupted.", intent: "Low" };
   }
 };
 
 /**
- * Generates an outreach message using gemini-3-flash-preview for basic text tasks.
+ * Generates non-salesy, personalized outreach using Gemini 3 Flash.
  */
 export const generateOutreach = async (lead: Lead): Promise<string> => {
   try {
@@ -67,32 +80,46 @@ export const generateOutreach = async (lead: Lead): Promise<string> => {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `
-        Write a friendly, short (2-3 sentence) LinkedIn message for ${lead.name} at ${lead.company}.
-        Tone: Professional but conversational. No sales fluff.
+        Write a short (max 25 words) LinkedIn connection request for ${lead.name}.
+        Headline: ${lead.headline} at ${lead.company}.
+        
+        RULES:
+        - Human tone. No sales pitch.
+        - No "I see you work at...".
+        - Mention a specific curiosity about their field or company mission.
+        - Low-friction ending.
       `,
     });
-    // Property access .text instead of .text() per guidelines.
-    return response.text?.trim() || "Hi, I'd love to connect!";
+    return response.text?.trim() || `Hi ${lead.name}, I've been following the work at ${lead.company} and would love to connect.`;
   } catch (error) {
-    console.error("Outreach generation error:", error);
-    return "Hi, I'd love to connect!";
+    return `Hi ${lead.name}, I'm interested in the mission at ${lead.company} and would love to connect.`;
   }
 };
 
 /**
- * Chat with an assistant about leads using gemini-3-flash-preview for general assistance.
+ * Strategic chat advisor using Gemini 3 Flash.
  */
-export const chatWithAssistant = async (message: string, leadsContext: Lead[]): Promise<string> => {
+export const chatWithAssistant = async (message: string, leads: Lead[]): Promise<string> => {
   try {
     const ai = getAI();
-    const context = leadsContext.slice(0, 5).map(l => `${l.name} (${l.company})`).join(', ');
+    const topLeads = leads
+      .filter(l => (l.score || 0) > 60)
+      .slice(0, 5)
+      .map(l => `${l.name} (${l.company})`)
+      .join(", ");
+    
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `User message: ${message}\nContext leads: ${context}`,
+      contents: `
+        You are the LinkPulse Strategy Engine.
+        Context: User has ${leads.length} leads. Top prospects: ${topLeads || 'None analyzed yet'}.
+        User asks: ${message}
+        
+        Provide punchy, tactical networking advice.
+      `,
     });
-    return response.text?.trim() || "I'm ready to help with your outreach.";
+    return response.text?.trim() || "I'm ready to help you optimize your outreach strategy.";
   } catch (error) {
-    console.error("Chat error:", error);
-    return "Service temporarily unavailable.";
+    return "Strategic advisory is currently in maintenance. Please try again shortly.";
   }
 };

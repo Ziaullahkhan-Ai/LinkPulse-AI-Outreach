@@ -12,12 +12,17 @@
                 extend: {
                     animation: {
                         'fade-in': 'fade-in 0.3s ease-out',
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'spin-slow': 'spin 8s linear infinite',
                     },
                     keyframes: {
                         'fade-in': {
                             '0%': { opacity: '0', transform: 'translateY(10px)' },
                             '100%': { opacity: '1', transform: 'translateY(0)' },
                         }
+                    },
+                    boxShadow: {
+                        '3xl': '0 35px 60px -15px rgba(0, 0, 0, 0.1)',
                     }
                 }
             }
@@ -35,6 +40,17 @@
         }
         #root {
             min-height: 100vh;
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        ::selection {
+            background-color: #6366f1;
+            color: white;
         }
     </style>
     
