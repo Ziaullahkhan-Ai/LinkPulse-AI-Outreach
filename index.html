@@ -13,12 +13,11 @@
                 extend: {
                     animation: {
                         'fade-in': 'fade-in 0.3s ease-out',
-                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                     },
                     keyframes: {
                         'fade-in': {
-                            '0%': { opacity: '0' },
-                            '100%': { opacity: '1' },
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
                         }
                     }
                 }
@@ -33,6 +32,7 @@
             padding: 0;
             background-color: #f8fafc;
             color: #0f172a;
+            -webkit-font-smoothing: antialiased;
         }
         #root {
             min-height: 100vh;

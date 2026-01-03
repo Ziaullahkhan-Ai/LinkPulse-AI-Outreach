@@ -10,11 +10,14 @@ const getAI = () => {
   return new GoogleGenAI({ apiKey: process.env.API_KEY as string });
 };
 
+/**
+ * Scores a lead using gemini-3-pro-preview for complex reasoning tasks.
+ */
 export const scoreLead = async (lead: Partial<Lead>): Promise<{ score: number; reasoning: string; intent: string }> => {
   try {
     const ai = getAI();
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-3-pro-preview',
       contents: `
         Analyze this LinkedIn prospect for B2B relevance:
         Name: ${lead.name}
@@ -37,14 +40,27 @@ export const scoreLead = async (lead: Partial<Lead>): Promise<{ score: number; r
       }
     });
 
-    const text = response.text;
-    return text ? JSON.parse(text) : { score: 0, reasoning: "No data", intent: "Low" };
+    // Extract text and trim as recommended by Gemini API guidelines.
+    const text = response.text?.trim();
+    if (!text) return { score: 0, reasoning: "No response from AI", intent: "Low" };
+    
+    try {
+      // Handle potential markdown formatting in the response.
+      const cleanedText = text.replace(/^```json\n?/, '').replace(/\n?```$/, '');
+      return JSON.parse(cleanedText);
+    } catch (parseError) {
+      console.error("JSON Parsing Error:", parseError, text);
+      return { score: 0, reasoning: "Failed to parse AI scoring data", intent: "Low" };
+    }
   } catch (error) {
     console.error("Score Error:", error);
     return { score: 0, reasoning: "Error analyzing lead", intent: "Low" };
   }
 };
 
+/**
+ * Generates an outreach message using gemini-3-flash-preview for basic text tasks.
+ */
 export const generateOutreach = async (lead: Lead): Promise<string> => {
   try {
     const ai = getAI();
@@ -55,12 +71,17 @@ export const generateOutreach = async (lead: Lead): Promise<string> => {
         Tone: Professional but conversational. No sales fluff.
       `,
     });
+    // Property access .text instead of .text() per guidelines.
     return response.text?.trim() || "Hi, I'd love to connect!";
   } catch (error) {
+    console.error("Outreach generation error:", error);
     return "Hi, I'd love to connect!";
   }
 };
 
+/**
+ * Chat with an assistant about leads using gemini-3-flash-preview for general assistance.
+ */
 export const chatWithAssistant = async (message: string, leadsContext: Lead[]): Promise<string> => {
   try {
     const ai = getAI();
@@ -71,6 +92,7 @@ export const chatWithAssistant = async (message: string, leadsContext: Lead[]): 
     });
     return response.text?.trim() || "I'm ready to help with your outreach.";
   } catch (error) {
+    console.error("Chat error:", error);
     return "Service temporarily unavailable.";
   }
 };
